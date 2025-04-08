@@ -95,6 +95,7 @@ end)
 -- ========================================
 -- 🟢 FlareGun ESP + Notification
 -- ========================================
+local flareGunESP = {} -- Tracks which flaregun we're watching
 local function notify(msg)
 	pcall(function()
 		game.StarterGui:SetCore("SendNotification", {
@@ -106,36 +107,42 @@ local function notify(msg)
 end
 
 local function applyFlareGunESP(flareGun)
-	if not flareGun:FindFirstChild("FlareGunESP") then
-		local primaryPart = flareGun:IsA("Model") and (flareGun.PrimaryPart or flareGun:FindFirstChildWhichIsA("BasePart")) or flareGun
-		if primaryPart then
-			local highlight = Instance.new("Highlight")
-			highlight.Name = "FlareGunESP"
-			highlight.FillColor = Color3.fromRGB(0, 255, 0)
-			highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-			highlight.FillTransparency = 0.3
-			highlight.OutlineTransparency = 0
-			highlight.Adornee = flareGun
-			highlight.Parent = flareGun
-			notify("✅ FlareGun is available in Collectibles!")
-		end
+	if flareGun:FindFirstChild("FlareGunESP") then return end
+
+	local primaryPart = flareGun:IsA("Model") and (flareGun.PrimaryPart or flareGun:FindFirstChildWhichIsA("BasePart")) or flareGun
+	if primaryPart then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "FlareGunESP"
+		highlight.FillColor = Color3.fromRGB(0, 255, 0)
+		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+		highlight.FillTransparency = 0.3
+		highlight.OutlineTransparency = 0
+		highlight.Adornee = flareGun
+		highlight.Parent = flareGun
 	end
 end
 
 local function watchFlareGun(flareGun)
-	if flareGun.Parent and flareGun.Parent.Name == "Collectibles" then
-		applyFlareGunESP(flareGun)
-	end
+	if flareGunESP[flareGun] then return end
 
-	-- Auto-remove alert when FlareGun is taken or removed
-	flareGun.AncestryChanged:Connect(function(_, parent)
-		if not flareGun:IsDescendantOf(workspace) or (parent and parent.Name ~= "Collectibles") then
-			notify("❌ FlareGun was collected or removed!")
-		end
-	end)
+	-- Only act if it's in Collectibles when added
+	if flareGun.Parent and flareGun.Parent.Name == "Collectibles" then
+		flareGunESP[flareGun] = true
+		applyFlareGunESP(flareGun)
+		notify("✅ FlareGun is available in Collectibles!")
+
+		flareGun.AncestryChanged:Connect(function(_, newParent)
+			if not flareGun:IsDescendantOf(workspace) or (newParent and newParent.Name ~= "Collectibles") then
+				if flareGunESP[flareGun] then
+					notify("❌ FlareGun was collected or removed!")
+					flareGunESP[flareGun] = nil
+				end
+			end
+		end)
+	end
 end
 
--- 📦 Listen for FlareGun being added to workspace
+-- Listen for new FlareGuns
 workspace.DescendantAdded:Connect(function(descendant)
 	if descendant.Name == "FlareGun" then
 		task.wait(0.1)
@@ -143,7 +150,7 @@ workspace.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
--- 🕵️ Initial Scan (just once)
+-- Initial scan
 for _, obj in ipairs(workspace:GetDescendants()) do
 	if obj.Name == "FlareGun" then
 		watchFlareGun(obj)
