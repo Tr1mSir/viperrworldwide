@@ -1,0 +1,209 @@
+-- 💾 Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+
+-- 🧍 Character Setup
+local character = player.Character or player.CharacterAdded:Wait()
+local HRP = character:WaitForChild("HumanoidRootPart")
+
+-- ========================================
+-- 🔴 Rake ESP
+-- ========================================
+local function createESP(target, name, fillColor)
+	if not target:FindFirstChild(name .. "ESP") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = name .. "ESP"
+		highlight.FillColor = fillColor
+		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+		highlight.FillTransparency = 0.5
+		highlight.OutlineTransparency = 0
+		highlight.Adornee = target
+		highlight.Parent = target
+	end
+end
+
+local function applyRakeESP()
+	local rake = workspace:FindFirstChild("Rake", true)
+	if rake then
+		createESP(rake, "Rake", Color3.fromRGB(255, 0, 0))
+	end
+end
+
+workspace.ChildAdded:Connect(function(child)
+	if child.Name == "Rake" then
+		task.wait(0.1)
+		applyRakeESP()
+	end
+end)
+
+applyRakeESP()
+
+-- ========================================
+-- 🟡 Scrap ESP + Auto Collect
+-- ========================================
+local collectDistance = 10
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
+-- 🟨 Add glow to Scrap
+local function handleScrap(scrap)
+	if scrap:IsA("PVInstance") and not scrap:FindFirstChild("ScrapESP") then
+		local highlight = Instance.new("Highlight")
+		highlight.Name = "ScrapESP"
+		highlight.FillColor = Color3.fromRGB(255, 255, 0)
+		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+		highlight.FillTransparency = 0.3
+		highlight.OutlineTransparency = 0
+		highlight.Adornee = scrap
+		highlight.Parent = scrap
+	end
+end
+
+-- 🟨 Initial ESP pass
+for _, obj in ipairs(workspace:GetDescendants()) do
+	if obj.Name == "Scrap" then
+		handleScrap(obj)
+	end
+end
+
+-- 🟨 Watch for future Scrap
+workspace.DescendantAdded:Connect(function(descendant)
+	if descendant.Name == "Scrap" then
+		task.wait(0.1)
+		handleScrap(descendant)
+	end
+end)
+
+-- 🟨 Auto-collect nearby Scrap prompts (event-based)
+ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
+	local parent = prompt.Parent
+	if parent and parent.Name == "Scrap" then
+		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+		if hrp and (hrp.Position - parent.Position).Magnitude <= collectDistance then
+			task.wait(0.05)
+			pcall(function()
+				prompt:InputHoldBegin()
+				task.wait(0.1)
+				prompt:InputHoldEnd()
+			end)
+		end
+	end
+end)
+
+-- ========================================
+-- 🟢 FlareGun ESP + Notification
+-- ========================================
+local function notify(msg)
+	pcall(function()
+		game.StarterGui:SetCore("SendNotification", {
+			Title = "FlareGun Update",
+			Text = msg,
+			Duration = 3
+		})
+	end)
+end
+
+local function applyFlareGunESP(flareGun)
+	if not flareGun:FindFirstChild("FlareGunESP") then
+		local primaryPart = flareGun:IsA("Model") and (flareGun.PrimaryPart or flareGun:FindFirstChildWhichIsA("BasePart")) or flareGun
+		if primaryPart then
+			local highlight = Instance.new("Highlight")
+			highlight.Name = "FlareGunESP"
+			highlight.FillColor = Color3.fromRGB(0, 255, 0)
+			highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+			highlight.FillTransparency = 0.3
+			highlight.OutlineTransparency = 0
+			highlight.Adornee = flareGun
+			highlight.Parent = flareGun
+			notify("✅ FlareGun is available in Collectibles!")
+		end
+	end
+end
+
+local function watchFlareGun(flareGun)
+	if flareGun.Parent and flareGun.Parent.Name == "Collectibles" then
+		applyFlareGunESP(flareGun)
+	end
+
+	-- Auto-remove alert when FlareGun is taken or removed
+	flareGun.AncestryChanged:Connect(function(_, parent)
+		if not flareGun:IsDescendantOf(workspace) or (parent and parent.Name ~= "Collectibles") then
+			notify("❌ FlareGun was collected or removed!")
+		end
+	end)
+end
+
+-- 📦 Listen for FlareGun being added to workspace
+workspace.DescendantAdded:Connect(function(descendant)
+	if descendant.Name == "FlareGun" then
+		task.wait(0.1)
+		watchFlareGun(descendant)
+	end
+end)
+
+-- 🕵️ Initial Scan (just once)
+for _, obj in ipairs(workspace:GetDescendants()) do
+	if obj.Name == "FlareGun" then
+		watchFlareGun(obj)
+	end
+end
+-- ========================================
+-- 🔆 Lighting Lock
+-- ========================================
+local desiredBrightness = 2
+local desiredDiffuse = 1
+local desiredAtmosphereColor = Color3.fromRGB(107, 107, 107)
+local desiredAtmosphereDensity = 0.4
+
+-- Get atmosphere (or wait for it to appear)
+local function getAtmosphere()
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+	if not atmosphere then
+		atmosphere = Instance.new("Atmosphere")
+		atmosphere.Parent = Lighting
+	end
+	return atmosphere
+end
+
+-- Apply and lock lighting settings
+local function lockLightingSettings()
+	Lighting.Brightness = desiredBrightness
+	Lighting.EnvironmentDiffuseScale = desiredDiffuse
+
+	Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
+		if Lighting.Brightness ~= desiredBrightness then
+			Lighting.Brightness = desiredBrightness
+		end
+	end)
+
+	Lighting:GetPropertyChangedSignal("EnvironmentDiffuseScale"):Connect(function()
+		if Lighting.EnvironmentDiffuseScale ~= desiredDiffuse then
+			Lighting.EnvironmentDiffuseScale = desiredDiffuse
+		end
+	end)
+end
+
+-- Apply and lock atmosphere settings
+local function lockAtmosphereSettings()
+	local atmosphere = getAtmosphere()
+	atmosphere.Color = desiredAtmosphereColor
+	atmosphere.Density = desiredAtmosphereDensity
+
+	atmosphere:GetPropertyChangedSignal("Color"):Connect(function()
+		if atmosphere.Color ~= desiredAtmosphereColor then
+			atmosphere.Color = desiredAtmosphereColor
+		end
+	end)
+
+	atmosphere:GetPropertyChangedSignal("Density"):Connect(function()
+		if atmosphere.Density ~= desiredAtmosphereDensity then
+			atmosphere.Density = desiredAtmosphereDensity
+		end
+	end)
+end
+
+-- 🚀 Start the lock
+lockLightingSettings()
+lockAtmosphereSettings()
