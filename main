@@ -2,16 +2,53 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local ProximityPromptService = game:GetService("ProximityPromptService")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+
+-- Global Feature Toggles
+_G.FeatureToggles = {
+	RakeESP = true,
+	ScrapESP = true,
+	AutoCollect = true,
+	FlareGunESP = true,
+	LightingLock = true
+}
+
+-- UI Setup
+local gui = Instance.new("ScreenGui")
+gui.Name = "FeatureToggleUI"
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local function makeToggle(name, order, toggleKey)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 200, 0, 40)
+	btn.Position = UDim2.new(0, 10, 0, 50 + (order * 45))
+	btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 20
+	btn.Text = name .. ": ON"
+	btn.Parent = gui
+
+	btn.MouseButton1Click:Connect(function()
+		_G.FeatureToggles[toggleKey] = not _G.FeatureToggles[toggleKey]
+		btn.Text = name .. ": " .. (_G.FeatureToggles[toggleKey] and "ON" or "OFF")
+	end)
+end
+
+makeToggle("Rake ESP", 0, "RakeESP")
+makeToggle("Scrap ESP", 1, "ScrapESP")
+makeToggle("Auto Collect", 2, "AutoCollect")
+makeToggle("FlareGun ESP", 3, "FlareGunESP")
+makeToggle("Lighting Lock", 4, "LightingLock")
 
 -- 🧍 Character Setup
 local character = player.Character or player.CharacterAdded:Wait()
 local HRP = character:WaitForChild("HumanoidRootPart")
 
--- ========================================
 -- 🔴 Rake ESP
--- ========================================
 local function createESP(target, name, fillColor)
 	if not target:FindFirstChild(name .. "ESP") then
 		local highlight = Instance.new("Highlight")
@@ -26,6 +63,7 @@ local function createESP(target, name, fillColor)
 end
 
 local function applyRakeESP()
+	if not _G.FeatureToggles.RakeESP then return end
 	local rake = workspace:FindFirstChild("Rake", true)
 	if rake then
 		createESP(rake, "Rake", Color3.fromRGB(255, 0, 0))
@@ -33,7 +71,7 @@ local function applyRakeESP()
 end
 
 workspace.ChildAdded:Connect(function(child)
-	if child.Name == "Rake" then
+	if _G.FeatureToggles.RakeESP and child.Name == "Rake" then
 		task.wait(0.1)
 		applyRakeESP()
 	end
@@ -41,14 +79,11 @@ end)
 
 applyRakeESP()
 
--- ========================================
 -- 🟡 Scrap ESP + Auto Collect
--- ========================================
 local collectDistance = 10
-local ProximityPromptService = game:GetService("ProximityPromptService")
 
--- 🟨 Add glow to Scrap
 local function handleScrap(scrap)
+	if not _G.FeatureToggles.ScrapESP then return end
 	if scrap:IsA("PVInstance") and not scrap:FindFirstChild("ScrapESP") then
 		local highlight = Instance.new("Highlight")
 		highlight.Name = "ScrapESP"
@@ -61,14 +96,12 @@ local function handleScrap(scrap)
 	end
 end
 
--- 🟨 Initial ESP pass
 for _, obj in ipairs(workspace:GetDescendants()) do
 	if obj.Name == "Scrap" then
 		handleScrap(obj)
 	end
 end
 
--- 🟨 Watch for future Scrap
 workspace.DescendantAdded:Connect(function(descendant)
 	if descendant.Name == "Scrap" then
 		task.wait(0.1)
@@ -76,8 +109,8 @@ workspace.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
--- 🟨 Auto-collect nearby Scrap prompts (event-based)
 ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
+	if not _G.FeatureToggles.AutoCollect then return end
 	local parent = prompt.Parent
 	if parent and parent.Name == "Scrap" then
 		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -92,10 +125,8 @@ ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
 	end
 end)
 
--- ========================================
 -- 🟢 FlareGun ESP + Notification
--- ========================================
-local flareGunESP = {} -- Tracks which flaregun we're watching
+local flareGunESP = {}
 local function notify(msg)
 	pcall(function()
 		game.StarterGui:SetCore("SendNotification", {
@@ -107,8 +138,8 @@ local function notify(msg)
 end
 
 local function applyFlareGunESP(flareGun)
+	if not _G.FeatureToggles.FlareGunESP then return end
 	if flareGun:FindFirstChild("FlareGunESP") then return end
-
 	local primaryPart = flareGun:IsA("Model") and (flareGun.PrimaryPart or flareGun:FindFirstChildWhichIsA("BasePart")) or flareGun
 	if primaryPart then
 		local highlight = Instance.new("Highlight")
@@ -123,14 +154,11 @@ local function applyFlareGunESP(flareGun)
 end
 
 local function watchFlareGun(flareGun)
-	if flareGunESP[flareGun] then return end
-
-	-- Only act if it's in Collectibles when added
+	if flareGunESP[flareGun] or not _G.FeatureToggles.FlareGunESP then return end
 	if flareGun.Parent and flareGun.Parent.Name == "Collectibles" then
 		flareGunESP[flareGun] = true
 		applyFlareGunESP(flareGun)
 		notify("✅ FlareGun is available in Collectibles!")
-
 		flareGun.AncestryChanged:Connect(function(_, newParent)
 			if not flareGun:IsDescendantOf(workspace) or (newParent and newParent.Name ~= "Collectibles") then
 				if flareGunESP[flareGun] then
@@ -142,7 +170,6 @@ local function watchFlareGun(flareGun)
 	end
 end
 
--- Listen for new FlareGuns
 workspace.DescendantAdded:Connect(function(descendant)
 	if descendant.Name == "FlareGun" then
 		task.wait(0.1)
@@ -150,21 +177,18 @@ workspace.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
--- Initial scan
 for _, obj in ipairs(workspace:GetDescendants()) do
 	if obj.Name == "FlareGun" then
 		watchFlareGun(obj)
 	end
 end
--- ========================================
+
 -- 🔆 Lighting Lock
--- ========================================
 local desiredBrightness = 2
 local desiredDiffuse = 1
 local desiredAtmosphereColor = Color3.fromRGB(107, 107, 107)
 local desiredAtmosphereDensity = 0.4
 
--- Get atmosphere (or wait for it to appear)
 local function getAtmosphere()
 	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
 	if not atmosphere then
@@ -174,43 +198,42 @@ local function getAtmosphere()
 	return atmosphere
 end
 
--- Apply and lock lighting settings
 local function lockLightingSettings()
+	if not _G.FeatureToggles.LightingLock then return end
 	Lighting.Brightness = desiredBrightness
 	Lighting.EnvironmentDiffuseScale = desiredDiffuse
 
 	Lighting:GetPropertyChangedSignal("Brightness"):Connect(function()
-		if Lighting.Brightness ~= desiredBrightness then
+		if _G.FeatureToggles.LightingLock and Lighting.Brightness ~= desiredBrightness then
 			Lighting.Brightness = desiredBrightness
 		end
 	end)
 
 	Lighting:GetPropertyChangedSignal("EnvironmentDiffuseScale"):Connect(function()
-		if Lighting.EnvironmentDiffuseScale ~= desiredDiffuse then
+		if _G.FeatureToggles.LightingLock and Lighting.EnvironmentDiffuseScale ~= desiredDiffuse then
 			Lighting.EnvironmentDiffuseScale = desiredDiffuse
 		end
 	end)
 end
 
--- Apply and lock atmosphere settings
 local function lockAtmosphereSettings()
+	if not _G.FeatureToggles.LightingLock then return end
 	local atmosphere = getAtmosphere()
 	atmosphere.Color = desiredAtmosphereColor
 	atmosphere.Density = desiredAtmosphereDensity
 
 	atmosphere:GetPropertyChangedSignal("Color"):Connect(function()
-		if atmosphere.Color ~= desiredAtmosphereColor then
+		if _G.FeatureToggles.LightingLock and atmosphere.Color ~= desiredAtmosphereColor then
 			atmosphere.Color = desiredAtmosphereColor
 		end
 	end)
 
 	atmosphere:GetPropertyChangedSignal("Density"):Connect(function()
-		if atmosphere.Density ~= desiredAtmosphereDensity then
+		if _G.FeatureToggles.LightingLock and atmosphere.Density ~= desiredAtmosphereDensity then
 			atmosphere.Density = desiredAtmosphereDensity
 		end
 	end)
 end
 
--- 🚀 Start the lock
 lockLightingSettings()
 lockAtmosphereSettings()
