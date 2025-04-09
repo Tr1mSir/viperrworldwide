@@ -220,10 +220,22 @@ lockAtmosphereSettings()
 -- Music mute
 -- ========================================
 local musicGroup = SoundService:FindFirstChild("Music")
-if musicGroup and musicGroup:IsA("SoundGroup") then
-	for _, sound in ipairs(musicGroup:GetDescendants()) do
-		if sound:IsA("Sound") then
-			sound.Volume = 0
-		end
+
+-- Function to mute a single sound
+local function muteSound(sound)
+	if sound:IsA("Sound") then
+		sound.Volume = 0
 	end
+end
+
+-- Mute all existing sounds in the Music group
+if musicGroup and musicGroup:IsA("SoundGroup") then
+	for _, descendant in ipairs(musicGroup:GetDescendants()) do
+		muteSound(descendant)
+	end
+
+	-- Listen for new sounds being added
+	musicGroup.DescendantAdded:Connect(function(newDescendant)
+		muteSound(newDescendant)
+	end)
 end
