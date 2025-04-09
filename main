@@ -4,6 +4,7 @@ local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+local SoundService = game:GetService("SoundService")
 
 -- 🧍 Character Setup
 local character = player.Character or player.CharacterAdded:Wait()
@@ -214,3 +215,15 @@ end
 -- 🚀 Start the lock
 lockLightingSettings()
 lockAtmosphereSettings()
+
+-- ========================================
+-- Music mute
+-- ========================================
+local musicGroup = SoundService:FindFirstChild("Music")
+if musicGroup and musicGroup:IsA("SoundGroup") then
+	for _, sound in ipairs(musicGroup:GetDescendants()) do
+		if sound:IsA("Sound") then
+			sound.Volume = 0
+		end
+	end
+end
