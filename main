@@ -219,23 +219,43 @@ lockAtmosphereSettings()
 -- ========================================
 -- Music mute
 -- ========================================
+
 local musicGroup = SoundService:FindFirstChild("Music")
 
--- Function to mute a single sound
-local function muteSound(sound)
-	if sound:IsA("Sound") then
+local function lockVolume(sound)
+	if sound:IsA("Sound") and sound.Name == "WindOfFjords" then
 		sound.Volume = 0
+
+		-- If already connected, skip
+		if not sound:FindFirstChild("__Locked") then
+			local tag = Instance.new("BoolValue")
+			tag.Name = "__Locked"
+			tag.Parent = sound
+
+			-- React to volume being changed by other scripts
+			sound.Changed:Connect(function(property)
+				if property == "Volume" and sound.Volume ~= 0 then
+					sound.Volume = 0
+				end
+			end)
+		end
 	end
 end
 
--- Mute all existing sounds in the Music group
-if musicGroup and musicGroup:IsA("SoundGroup") then
-	for _, descendant in ipairs(musicGroup:GetDescendants()) do
-		muteSound(descendant)
+-- Lock existing sounds
+for _, obj in ipairs(game:GetDescendants()) do
+	if obj:IsA("Sound") and obj.Name == "WindOfFjords" then
+		lockVolume(obj)
 	end
-
-	-- Listen for new sounds being added
-	musicGroup.DescendantAdded:Connect(function(newDescendant)
-		muteSound(newDescendant)
-	end)
 end
+
+-- Lock future sounds
+game.DescendantAdded:Connect(function(obj)
+	if obj:IsA("Sound") and obj.Name == "WindOfFjords" then
+		lockVolume(obj)
+	end
+end)
+
+-- ========================================
+-- Music mute
+-- ========================================
