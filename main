@@ -31,34 +31,59 @@ local function createESP(target, name, fillColor)
 end
 
 local function createHealthBillboard(rake)
+	local npcHumanoid = rake:FindFirstChild("NPC")
 	local hrp = rake:FindFirstChild("HumanoidRootPart")
-	local healthValue = rake:FindFirstChild("NPC") and rake.NPC:FindFirstChild("Health")
 
-	if hrp and healthValue then
+	-- Ensure that both the NPC humanoid and HumanoidRootPart exist
+	if npcHumanoid and npcHumanoid:IsA("Humanoid") and hrp then
+		-- Prevent duplicate BillboardGui
+		if hrp:FindFirstChild("HealthDisplay") then
+			return
+		end
+
 		local billboard = Instance.new("BillboardGui")
 		billboard.Name = "HealthDisplay"
 		billboard.Adornee = hrp
-		billboard.Size = UDim2.new(0, 100, 0, 40)
-		billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+		billboard.Size = UDim2.new(0, 150, 0, 50)  -- Increased size for better visibility
+		billboard.StudsOffset = Vector3.new(0, 3, 0)  -- Adjusted to make it appear above
 		billboard.AlwaysOnTop = true
+		billboard.MaxDistance = 75  -- Limits how far the BillboardGui can be seen
 		billboard.Parent = hrp
+
+		local background = Instance.new("Frame")
+		background.Size = UDim2.new(1, 0, 1, 0)
+		background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+		background.BackgroundTransparency = 0.5  -- Slight transparency to see behind
+		background.BorderSizePixel = 0  -- Removed border for a cleaner look
+		background.Parent = billboard
 
 		local textLabel = Instance.new("TextLabel")
 		textLabel.Size = UDim2.new(1, 0, 1, 0)
 		textLabel.BackgroundTransparency = 1
-		textLabel.TextColor3 = Color3.new(1, 0, 0)
-		textLabel.Font = Enum.Font.SourceSansBold
-		textLabel.TextSize = 20
-		textLabel.Text = "100%"
-		textLabel.Parent = billboard
+		textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  -- White text for clarity
+		textLabel.Font = Enum.Font.GothamBold  -- Changed font to a more stylish one
+		textLabel.TextSize = 24  -- Increased text size
+		textLabel.Text = "100%"  -- Default text before health changes
+		textLabel.TextStrokeTransparency = 1  -- Removed the text stroke for a cleaner look
+		textLabel.Parent = background
 
-		-- Update the health percentage
+		-- Real-time health updates
 		RunService.RenderStepped:Connect(function()
-			if rake.Parent and healthValue then
-				local percent = math.clamp((healthValue.Value / 100) * 100, 0, 100)
-				textLabel.Text = string.format("%.0f%%", percent)
+			if npcHumanoid and hrp and textLabel and billboard.Parent then
+				local percent = (npcHumanoid.Health / npcHumanoid.MaxHealth) * 100
+				textLabel.Text = string.format("%.0f%%", math.clamp(percent, 0, 100))
+				
+				-- Optionally change the text color based on health (Red for low)
+				if percent <= 20 then
+					textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)  -- Red when health is 20% or lower
+				else
+					textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  -- White for normal health
+				end
 			end
 		end)
+	else
+		-- If NPC is not valid or HumanoidRootPart missing
+		return
 	end
 end
 
