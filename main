@@ -15,6 +15,8 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- ========================================
 -- 🔴 Rake ESP
 -- ========================================
+local RunService = game:GetService("RunService")
+
 local function createESP(target, name, fillColor)
 	if not target:FindFirstChild(name .. "ESP") then
 		local highlight = Instance.new("Highlight")
@@ -28,10 +30,43 @@ local function createESP(target, name, fillColor)
 	end
 end
 
+local function createHealthBillboard(rake)
+	local hrp = rake:FindFirstChild("HumanoidRootPart")
+	local healthValue = rake:FindFirstChild("NPC") and rake.NPC:FindFirstChild("Health")
+
+	if hrp and healthValue then
+		local billboard = Instance.new("BillboardGui")
+		billboard.Name = "HealthDisplay"
+		billboard.Adornee = hrp
+		billboard.Size = UDim2.new(0, 100, 0, 40)
+		billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+		billboard.AlwaysOnTop = true
+		billboard.Parent = hrp
+
+		local textLabel = Instance.new("TextLabel")
+		textLabel.Size = UDim2.new(1, 0, 1, 0)
+		textLabel.BackgroundTransparency = 1
+		textLabel.TextColor3 = Color3.new(1, 0, 0)
+		textLabel.Font = Enum.Font.SourceSansBold
+		textLabel.TextSize = 20
+		textLabel.Text = "100%"
+		textLabel.Parent = billboard
+
+		-- Update the health percentage
+		RunService.RenderStepped:Connect(function()
+			if rake.Parent and healthValue then
+				local percent = math.clamp((healthValue.Value / 100) * 100, 0, 100)
+				textLabel.Text = string.format("%.0f%%", percent)
+			end
+		end)
+	end
+end
+
 local function applyRakeESP()
 	local rake = workspace:FindFirstChild("Rake", true)
 	if rake then
 		createESP(rake, "Rake", Color3.fromRGB(255, 0, 0))
+		createHealthBillboard(rake)
 	end
 end
 
