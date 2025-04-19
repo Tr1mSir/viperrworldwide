@@ -5,10 +5,12 @@ local Lighting = game:GetService("Lighting")
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local SoundService = game:GetService("SoundService")
+local RunService = game:GetService("RunService")
 
 -- 🧍 Character Setup
 local character = player.Character or player.CharacterAdded:Wait()
 local HRP = character:WaitForChild("HumanoidRootPart")
+local playerGui = player:WaitForChild("PlayerGui")
 
 -- ========================================
 -- 🔴 Rake ESP
@@ -257,5 +259,49 @@ game.DescendantAdded:Connect(function(obj)
 end)
 
 -- ========================================
--- Music mute
+-- Clock GUI
 -- ========================================
+
+-- Wait for existing MainGui and HealthBar
+local mainGui = playerGui:WaitForChild("MainGui")
+local healthBar = mainGui:WaitForChild("HealthBar")
+
+-- Create the clock label (directly in MainGui)
+local clockLabel = Instance.new("TextLabel")
+clockLabel.Name = "ClockLabel"
+clockLabel.AnchorPoint = Vector2.new(0, 1)
+clockLabel.Position = UDim2.new(0.46, 0, 1, -90)
+clockLabel.Size = UDim2.new(0, 150, 0, 50)
+clockLabel.BackgroundTransparency = 0.3
+clockLabel.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+clockLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+clockLabel.Font = Enum.Font.SourceSansBold
+clockLabel.TextSize = 32
+clockLabel.Text = "00:00"
+clockLabel.Visible = true -- 🔒 Hidden until HealthBar is visible
+clockLabel.Parent = mainGui
+
+-- Timer value reference
+local timerValue = workspace:WaitForChild("Info"):WaitForChild("Timer")
+
+-- Format seconds into MM:SS
+local function formatTime(seconds)
+	seconds = math.max(0, math.floor(seconds))
+	local minutes = math.floor(seconds / 60)
+	local secs = seconds % 60
+	return string.format("%02d:%02d", minutes, secs)
+end
+
+-- Show the clock only when HealthBar is visible
+healthBar:GetPropertyChangedSignal("Visible"):Connect(function()
+	clockLabel.Visible = healthBar.Visible
+end)
+
+-- Update time
+RunService.RenderStepped:Connect(function()
+	if clockLabel.Visible and timerValue and timerValue:IsA("NumberValue") then
+		local time = timerValue.Value
+		clockLabel.Text = formatTime(time)
+		clockLabel.TextColor3 = time < 10 and Color3.fromRGB(255, 50, 50) or Color3.fromRGB(255, 255, 255)
+	end
+end)
