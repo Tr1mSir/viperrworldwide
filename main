@@ -2,21 +2,18 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
+local SoundService = game:GetService("SoundService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
-local SoundService = game:GetService("SoundService")
-local RunService = game:GetService("RunService")
-
--- 🧍 Character Setup
+local playerGui = player:WaitForChild("PlayerGui")
 local character = player.Character or player.CharacterAdded:Wait()
 local HRP = character:WaitForChild("HumanoidRootPart")
-local playerGui = player:WaitForChild("PlayerGui")
 
 -- ========================================
--- 🔴 Rake ESP
+-- 🔴 Rake ESP + Health Percentage
 -- ========================================
-local RunService = game:GetService("RunService")
-
 local function createESP(target, name, fillColor)
 	if not target:FindFirstChild(name .. "ESP") then
 		local highlight = Instance.new("Highlight")
@@ -31,60 +28,41 @@ local function createESP(target, name, fillColor)
 end
 
 local function createHealthBillboard(rake)
-	local npcHumanoid = rake:FindFirstChild("NPC")
+	local humanoid = rake:FindFirstChild("NPC")
 	local hrp = rake:FindFirstChild("HumanoidRootPart")
+	if not humanoid or not hrp or not humanoid:IsA("Humanoid") or hrp:FindFirstChild("HealthDisplay") then return end
 
-	-- Ensure that both the NPC humanoid and HumanoidRootPart exist
-	if npcHumanoid and npcHumanoid:IsA("Humanoid") and hrp then
-		-- Prevent duplicate BillboardGui
-		if hrp:FindFirstChild("HealthDisplay") then
-			return
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "HealthDisplay"
+	gui.Adornee = hrp
+	gui.Size = UDim2.new(0, 150, 0, 50)
+	gui.StudsOffset = Vector3.new(0, 3, 0)
+	gui.MaxDistance = 75
+	gui.AlwaysOnTop = true
+	gui.Parent = hrp
+
+	local background = Instance.new("Frame", gui)
+	background.Size = UDim2.new(1, 0, 1, 0)
+	background.BackgroundColor3 = Color3.new(0, 0, 0)
+	background.BackgroundTransparency = 0.5
+	background.BorderSizePixel = 0
+
+	local text = Instance.new("TextLabel", background)
+	text.Size = UDim2.new(1, 0, 1, 0)
+	text.BackgroundTransparency = 1
+	text.TextColor3 = Color3.new(1, 1, 1)
+	text.Font = Enum.Font.GothamBold
+	text.TextSize = 24
+	text.Text = "100%"
+	text.TextStrokeTransparency = 1
+
+	RunService.RenderStepped:Connect(function()
+		if humanoid and gui and gui.Parent then
+			local percent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+			text.Text = string.format("%.0f%%", percent * 100)
+			text.TextColor3 = percent <= 0.2 and Color3.new(1, 0, 0) or Color3.new(1, 1, 1)
 		end
-
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "HealthDisplay"
-		billboard.Adornee = hrp
-		billboard.Size = UDim2.new(0, 150, 0, 50)  -- Increased size for better visibility
-		billboard.StudsOffset = Vector3.new(0, 3, 0)  -- Adjusted to make it appear above
-		billboard.AlwaysOnTop = true
-		billboard.MaxDistance = 75  -- Limits how far the BillboardGui can be seen
-		billboard.Parent = hrp
-
-		local background = Instance.new("Frame")
-		background.Size = UDim2.new(1, 0, 1, 0)
-		background.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-		background.BackgroundTransparency = 0.5  -- Slight transparency to see behind
-		background.BorderSizePixel = 0  -- Removed border for a cleaner look
-		background.Parent = billboard
-
-		local textLabel = Instance.new("TextLabel")
-		textLabel.Size = UDim2.new(1, 0, 1, 0)
-		textLabel.BackgroundTransparency = 1
-		textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  -- White text for clarity
-		textLabel.Font = Enum.Font.GothamBold  -- Changed font to a more stylish one
-		textLabel.TextSize = 24  -- Increased text size
-		textLabel.Text = "100%"  -- Default text before health changes
-		textLabel.TextStrokeTransparency = 1  -- Removed the text stroke for a cleaner look
-		textLabel.Parent = background
-
-		-- Real-time health updates
-		RunService.RenderStepped:Connect(function()
-			if npcHumanoid and hrp and textLabel and billboard.Parent then
-				local percent = (npcHumanoid.Health / npcHumanoid.MaxHealth) * 100
-				textLabel.Text = string.format("%.0f%%", math.clamp(percent, 0, 100))
-				
-				-- Optionally change the text color based on health (Red for low)
-				if percent <= 20 then
-					textLabel.TextColor3 = Color3.fromRGB(255, 0, 0)  -- Red when health is 20% or lower
-				else
-					textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)  -- White for normal health
-				end
-			end
-		end)
-	else
-		-- If NPC is not valid or HumanoidRootPart missing
-		return
-	end
+	end)
 end
 
 local function applyRakeESP()
@@ -95,8 +73,8 @@ local function applyRakeESP()
 	end
 end
 
-workspace.ChildAdded:Connect(function(child)
-	if child.Name == "Rake" then
+workspace.ChildAdded:Connect(function(c)
+	if c.Name == "Rake" then
 		task.wait(0.1)
 		applyRakeESP()
 	end
@@ -108,9 +86,7 @@ applyRakeESP()
 -- 🟡 Scrap ESP + Auto Collect
 -- ========================================
 local collectDistance = 10
-local ProximityPromptService = game:GetService("ProximityPromptService")
 
--- 🟨 Add glow to Scrap
 local function handleScrap(scrap)
 	if scrap:IsA("PVInstance") and not scrap:FindFirstChild("ScrapESP") then
 		local highlight = Instance.new("Highlight")
@@ -124,41 +100,37 @@ local function handleScrap(scrap)
 	end
 end
 
--- 🟨 Initial ESP pass
 for _, obj in ipairs(workspace:GetDescendants()) do
-	if obj.Name == "Scrap" then
-		handleScrap(obj)
-	end
+	if obj.Name == "Scrap" then handleScrap(obj) end
 end
 
--- 🟨 Watch for future Scrap
-workspace.DescendantAdded:Connect(function(descendant)
-	if descendant.Name == "Scrap" then
+workspace.DescendantAdded:Connect(function(desc)
+	if desc.Name == "Scrap" then
 		task.wait(0.1)
-		handleScrap(descendant)
+		handleScrap(desc)
 	end
 end)
 
--- 🟨 Auto-collect nearby Scrap prompts (event-based)
-ProximityPromptService.PromptShown:Connect(function(prompt, inputType)
-	local parent = prompt.Parent
-	if parent and parent.Name == "Scrap" then
-		local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-		if hrp and (hrp.Position - parent.Position).Magnitude <= collectDistance then
-			task.wait(0.05)
-			pcall(function()
-				prompt:InputHoldBegin()
-				task.wait(0.1)
-				prompt:InputHoldEnd()
+ProximityPromptService.PromptShown:Connect(function(prompt)
+	if prompt.Parent and prompt.Parent.Name == "Scrap" then
+		local pos = prompt.Parent.Position
+		if (HRP.Position - pos).Magnitude <= collectDistance then
+			task.delay(0.05, function()
+				pcall(function()
+					prompt:InputHoldBegin()
+					task.wait(0.1)
+					prompt:InputHoldEnd()
+				end)
 			end)
 		end
 	end
 end)
 
 -- ========================================
--- 🟢 FlareGun ESP + Notification
+-- 🟢 FlareGun ESP + Notifications
 -- ========================================
-local flareGunESP = {} -- Tracks which flaregun we're watching
+local flareGunESP = {}
+
 local function notify(msg)
 	pcall(function()
 		game.StarterGui:SetCore("SendNotification", {
@@ -169,56 +141,52 @@ local function notify(msg)
 	end)
 end
 
-local function applyFlareGunESP(flareGun)
-	if flareGun:FindFirstChild("FlareGunESP") then return end
+local function applyFlareGunESP(gun)
+	if gun:FindFirstChild("FlareGunESP") then return end
 
-	local primaryPart = flareGun:IsA("Model") and (flareGun.PrimaryPart or flareGun:FindFirstChildWhichIsA("BasePart")) or flareGun
-	if primaryPart then
+	local mainPart = gun:IsA("Model") and (gun.PrimaryPart or gun:FindFirstChildWhichIsA("BasePart")) or gun
+	if mainPart then
 		local highlight = Instance.new("Highlight")
 		highlight.Name = "FlareGunESP"
 		highlight.FillColor = Color3.fromRGB(0, 255, 0)
 		highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 		highlight.FillTransparency = 0.3
 		highlight.OutlineTransparency = 0
-		highlight.Adornee = flareGun
-		highlight.Parent = flareGun
+		highlight.Adornee = gun
+		highlight.Parent = gun
 	end
 end
 
-local function watchFlareGun(flareGun)
-	if flareGunESP[flareGun] then return end
+local function watchFlareGun(gun)
+	if flareGunESP[gun] or gun.Parent.Name ~= "Collectibles" then return end
 
-	-- Only act if it's in Collectibles when added
-	if flareGun.Parent and flareGun.Parent.Name == "Collectibles" then
-		flareGunESP[flareGun] = true
-		applyFlareGunESP(flareGun)
-		notify("✅ FlareGun is available in Collectibles!")
+	flareGunESP[gun] = true
+	applyFlareGunESP(gun)
+	notify("✅ FlareGun is available in Collectibles!")
 
-		flareGun.AncestryChanged:Connect(function(_, newParent)
-			if not flareGun:IsDescendantOf(workspace) or (newParent and newParent.Name ~= "Collectibles") then
-				if flareGunESP[flareGun] then
-					notify("❌ FlareGun was collected or removed!")
-					flareGunESP[flareGun] = nil
-				end
+	gun.AncestryChanged:Connect(function(_, newParent)
+		if not gun:IsDescendantOf(workspace) or (newParent and newParent.Name ~= "Collectibles") then
+			if flareGunESP[gun] then
+				notify("❌ FlareGun was collected or removed!")
+				flareGunESP[gun] = nil
 			end
-		end)
-	end
+		end
+	end)
 end
 
--- Listen for new FlareGuns
-workspace.DescendantAdded:Connect(function(descendant)
-	if descendant.Name == "FlareGun" then
-		task.wait(0.1)
-		watchFlareGun(descendant)
-	end
-end)
-
--- Initial scan
 for _, obj in ipairs(workspace:GetDescendants()) do
 	if obj.Name == "FlareGun" then
 		watchFlareGun(obj)
 	end
 end
+
+workspace.DescendantAdded:Connect(function(desc)
+	if desc.Name == "FlareGun" then
+		task.wait(0.1)
+		watchFlareGun(desc)
+	end
+end)
+
 -- ========================================
 -- 🔆 Lighting Lock
 -- ========================================
@@ -227,18 +195,7 @@ local desiredDiffuse = 1
 local desiredAtmosphereColor = Color3.fromRGB(107, 107, 107)
 local desiredAtmosphereDensity = 0.4
 
--- Get atmosphere (or wait for it to appear)
-local function getAtmosphere()
-	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-	if not atmosphere then
-		atmosphere = Instance.new("Atmosphere")
-		atmosphere.Parent = Lighting
-	end
-	return atmosphere
-end
-
--- Apply and lock lighting settings
-local function lockLightingSettings()
+local function lockLighting()
 	Lighting.Brightness = desiredBrightness
 	Lighting.EnvironmentDiffuseScale = desiredDiffuse
 
@@ -253,11 +210,8 @@ local function lockLightingSettings()
 			Lighting.EnvironmentDiffuseScale = desiredDiffuse
 		end
 	end)
-end
 
--- Apply and lock atmosphere settings
-local function lockAtmosphereSettings()
-	local atmosphere = getAtmosphere()
+	local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere", Lighting)
 	atmosphere.Color = desiredAtmosphereColor
 	atmosphere.Density = desiredAtmosphereDensity
 
@@ -274,29 +228,18 @@ local function lockAtmosphereSettings()
 	end)
 end
 
--- 🚀 Start the lock
-lockLightingSettings()
-lockAtmosphereSettings()
+lockLighting()
 
 -- ========================================
--- Music mute
+-- 🔇 Lock Specific Music Volume
 -- ========================================
-
-local musicGroup = SoundService:FindFirstChild("Music")
-
-local function lockVolume(sound)
+local function lockMusicVolume(sound)
 	if sound:IsA("Sound") and sound.Name == "WindOfFjords" then
 		sound.Volume = 0
-
-		-- If already connected, skip
 		if not sound:FindFirstChild("__Locked") then
-			local tag = Instance.new("BoolValue")
-			tag.Name = "__Locked"
-			tag.Parent = sound
-
-			-- React to volume being changed by other scripts
-			sound.Changed:Connect(function(property)
-				if property == "Volume" and sound.Volume ~= 0 then
+			Instance.new("BoolValue", sound).Name = "__Locked"
+			sound.Changed:Connect(function(prop)
+				if prop == "Volume" and sound.Volume ~= 0 then
 					sound.Volume = 0
 				end
 			end)
@@ -304,29 +247,24 @@ local function lockVolume(sound)
 	end
 end
 
--- Lock existing sounds
 for _, obj in ipairs(game:GetDescendants()) do
 	if obj:IsA("Sound") and obj.Name == "WindOfFjords" then
-		lockVolume(obj)
+		lockMusicVolume(obj)
 	end
 end
 
--- Lock future sounds
 game.DescendantAdded:Connect(function(obj)
 	if obj:IsA("Sound") and obj.Name == "WindOfFjords" then
-		lockVolume(obj)
+		lockMusicVolume(obj)
 	end
 end)
 
 -- ========================================
--- Clock GUI
+-- 🕒 Clock GUI (MM:SS above inventory)
 -- ========================================
-
--- Wait for existing MainGui and HealthBar
 local mainGui = playerGui:WaitForChild("MainGui")
 local healthBar = mainGui:WaitForChild("HealthBar")
 
--- Create the clock label (directly in MainGui)
 local clockLabel = Instance.new("TextLabel")
 clockLabel.Name = "ClockLabel"
 clockLabel.AnchorPoint = Vector2.new(0, 1)
@@ -338,13 +276,11 @@ clockLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 clockLabel.Font = Enum.Font.SourceSansBold
 clockLabel.TextSize = 32
 clockLabel.Text = "00:00"
-clockLabel.Visible = true -- 🔒 Hidden until HealthBar is visible
+clockLabel.Visible = healthBar.Visible
 clockLabel.Parent = mainGui
 
--- Timer value reference
 local timerValue = workspace:WaitForChild("Info"):WaitForChild("Timer")
 
--- Format seconds into MM:SS
 local function formatTime(seconds)
 	seconds = math.max(0, math.floor(seconds))
 	local minutes = math.floor(seconds / 60)
@@ -352,12 +288,10 @@ local function formatTime(seconds)
 	return string.format("%02d:%02d", minutes, secs)
 end
 
--- Show the clock only when HealthBar is visible
 healthBar:GetPropertyChangedSignal("Visible"):Connect(function()
 	clockLabel.Visible = healthBar.Visible
 end)
 
--- Update time
 RunService.RenderStepped:Connect(function()
 	if clockLabel.Visible and timerValue and timerValue:IsA("NumberValue") then
 		local time = timerValue.Value
