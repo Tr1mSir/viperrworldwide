@@ -9,7 +9,18 @@ local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
 local playerGui = player:WaitForChild("PlayerGui")
 local character = player.Character or player.CharacterAdded:Wait()
-local HRP = character:WaitForChild("HumanoidRootPart")
+local HRP -- Will hold current HumanoidRootPart
+
+-- Keeps HRP updated on respawn
+local function onCharacterAdded(char)
+	HRP = char:WaitForChild("HumanoidRootPart")
+end
+
+if player.Character then
+	onCharacterAdded(player.Character)
+end
+
+player.CharacterAdded:Connect(onCharacterAdded)
 
 -- ========================================
 -- 🔴 Rake ESP + Health Percentage
